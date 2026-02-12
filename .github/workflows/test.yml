@@ -1,0 +1,56 @@
+name: Test
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [main, develop, next]
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Dev Drive
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@v3
+        with:
+          env-mapping: |
+            PNPM_HOME,{{ DEV_DRIVE }}/.pnpm
+            PNPM_STORE_DIR,{{ DEV_DRIVE }}/.pnpm-store
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: true
+
+      - name: Build
+        run: pnpm build
+
+      - name: Lint
+        if: runner.os == 'Linux'
+        run: pnpm lint
+
+      - name: Type check
+        if: runner.os == 'Linux'
+        run: pnpm type-check
+
+      - name: Test
+        if: runner.os == 'Linux'
+        run: pnpm concurrently --names 'test,node20' 'pnpm test' 'pnpm --use-node-version=20.20.0 node ./tests/node20-compat.mjs'
+
+      - name: Test
+        if: runner.os != 'Linux'
+        run: pnpm test
