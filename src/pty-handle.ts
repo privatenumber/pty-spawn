@@ -17,13 +17,12 @@ type PtyHandle = {
 	resize: (columns: number, rows: number) => void;
 };
 
-const hostScriptPath = fileURLToPath(import.meta.resolve('#pty-host'));
-
-const createHostedHandle = (
+export const createHostedHandle = (
 	file: string,
 	args: string[],
 	options: IPtyForkOptions,
 ): PtyHandle => {
+	const hostScriptPath = fileURLToPath(import.meta.resolve('#pty-host'));
 	const child = cpSpawn(process.execPath, ['--no-warnings', hostScriptPath], {
 		stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
 		windowsHide: true,
@@ -59,14 +58,16 @@ const createHostedHandle = (
 		}
 	});
 
-	child.on('error', () => {});
+	child.on('error', () => {
+		fireExit({ exitCode: 1 });
+	});
 
 	child.on('exit', (code) => {
 		fireExit({ exitCode: code ?? 1 });
 	});
 
 	return {
-		pid: child.pid!,
+		pid: child.pid ?? 0,
 		onData: (callback) => {
 			dataCallback = callback;
 		},
@@ -81,7 +82,7 @@ const createHostedHandle = (
 				try {
 					child.kill();
 				} catch {}
-			}, 5000);
+			}, 2000);
 			timer.unref();
 		},
 		write: (data) => {
@@ -104,6 +105,10 @@ const createHostedHandle = (
 	};
 };
 
+const nodePty = process.platform === 'win32'
+	? undefined
+	: await import('node-pty');
+
 export const createPtyHandle = process.platform === 'win32'
 	? createHostedHandle
-	: (await import('node-pty'))!.spawn;
+	: nodePty!.spawn;
