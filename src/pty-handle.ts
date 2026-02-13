@@ -179,12 +179,6 @@ const createHostedHandle = (
 	};
 };
 
-export const createPtyHandle = (
-	file: string,
-	args: string[],
-	options: IPtyForkOptions,
-): PtyHandle => (
-	process.platform === 'win32'
-		? createHostedHandle(file, args, options)
-		: createDirectHandle(file, args, options)
-);
+export const createPtyHandle = process.platform === 'win32'
+	? createHostedHandle
+	: createDirectHandle;
