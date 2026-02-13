@@ -1,7 +1,7 @@
 import { EventEmitter, on } from 'node:events';
 import { constants as osConstants } from 'node:os';
 import type { IPtyForkOptions } from 'node-pty';
-import { createPtyHandle } from './pty-handle.ts';
+import { createPtyHandle } from './pty-bridge.ts';
 
 export type Result = {
 	output: string;

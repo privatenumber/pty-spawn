@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import {
 	describe, test, expect, skip,
 } from 'manten';
-import { createHostedHandle } from '../src/pty-handle.ts';
+import { createHostedHandle } from '../src/pty-bridge.ts';
 import {
 	spawn,
 	SubprocessError,
