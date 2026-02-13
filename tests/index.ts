@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import {
 	describe, test, expect, skip,
 } from 'manten';
-import { createHostedHandle } from '../src/pty-bridge.ts';
+import { createHostedPtyProcess } from '../src/pty-bridge.ts';
 import {
 	spawn,
 	SubprocessError,
@@ -686,9 +686,9 @@ await describe('pty-spawn', () => {
 	});
 });
 
-await describe('hosted handle', () => {
+await describe('hosted pty process', () => {
 	const spawnHosted = (script: string) => {
-		const handle = createHostedHandle(
+		const ptyProcess = createHostedPtyProcess(
 			process.execPath,
 			['--no-warnings', '-e', script],
 			{
@@ -696,32 +696,32 @@ await describe('hosted handle', () => {
 				rows: 24,
 			},
 		);
-		return handle;
+		return ptyProcess;
 	};
 
 	test('spawns process and receives output via IPC', async () => {
-		const handle = spawnHosted("process.stdout.write('hello hosted')");
+		const ptyProcess = spawnHosted("process.stdout.write('hello hosted')");
 
 		const { promise, resolve } = Promise.withResolvers<void>();
 		let output = '';
-		handle.onData((data) => {
+		ptyProcess.onData((data) => {
 			output += data;
 			if (output.includes('hello hosted')) {
 				resolve();
 			}
 		});
-		handle.onExit(() => {});
+		ptyProcess.onExit(() => {});
 
 		await promise;
 		expect(output).toContain('hello hosted');
 	}, { retry: 2 });
 
 	test('exit code propagates from child', async () => {
-		const handle = spawnHosted('process.exit(42)');
+		const ptyProcess = spawnHosted('process.exit(42)');
 
 		const { promise, resolve } = Promise.withResolvers<number>();
-		handle.onData(() => {});
-		handle.onExit((event) => {
+		ptyProcess.onData(() => {});
+		ptyProcess.onExit((event) => {
 			resolve(event.exitCode);
 		});
 
@@ -730,11 +730,11 @@ await describe('hosted handle', () => {
 	}, { retry: 2 });
 
 	test('zero exit code on success', async () => {
-		const handle = spawnHosted("process.stdout.write('ok'); process.exit(0)");
+		const ptyProcess = spawnHosted("process.stdout.write('ok'); process.exit(0)");
 
 		const { promise, resolve } = Promise.withResolvers<number>();
-		handle.onData(() => {});
-		handle.onExit((event) => {
+		ptyProcess.onData(() => {});
+		ptyProcess.onExit((event) => {
 			resolve(event.exitCode);
 		});
 
@@ -747,7 +747,7 @@ await describe('hosted handle', () => {
 			skip('ConPTY stdin delivery is unreliable on Windows');
 		}
 
-		const handle = spawnHosted([
+		const ptyProcess = spawnHosted([
 			"process.stdout.write('READY')",
 			'process.stdin.resume()',
 			"process.stdin.once('data', (data) => {",
@@ -758,13 +758,13 @@ await describe('hosted handle', () => {
 
 		const { promise: exitPromise, resolve: resolveExit } = Promise.withResolvers<void>();
 		let output = '';
-		handle.onData((data) => {
+		ptyProcess.onData((data) => {
 			output += data;
 			if (output.includes('READY')) {
-				handle.write('ping\n');
+				ptyProcess.write('ping\n');
 			}
 		});
-		handle.onExit(() => {
+		ptyProcess.onExit(() => {
 			resolveExit();
 		});
 
@@ -773,34 +773,34 @@ await describe('hosted handle', () => {
 	});
 
 	test('kill terminates the hosted process', async () => {
-		const handle = spawnHosted('setInterval(() => {}, 10000)');
+		const ptyProcess = spawnHosted('setInterval(() => {}, 10000)');
 
 		const { promise, resolve } = Promise.withResolvers<number>();
-		handle.onData(() => {});
-		handle.onExit((event) => {
+		ptyProcess.onData(() => {});
+		ptyProcess.onExit((event) => {
 			resolve(event.exitCode);
 		});
 
 		await delay(50);
-		handle.kill();
+		ptyProcess.kill();
 
 		const exitCode = await promise;
 		expect(typeof exitCode).toBe('number');
 	}, { retry: 2 });
 
 	test('resize does not throw', async () => {
-		const handle = spawnHosted('setTimeout(() => process.exit(0), 200)');
+		const ptyProcess = spawnHosted('setTimeout(() => process.exit(0), 200)');
 
 		const { promise, resolve } = Promise.withResolvers<void>();
-		handle.onData(() => {});
-		handle.onExit(() => {
+		ptyProcess.onData(() => {});
+		ptyProcess.onExit(() => {
 			resolve();
 		});
 
 		await delay(30);
 		let threw = false;
 		try {
-			handle.resize(120, 40);
+			ptyProcess.resize(120, 40);
 		} catch {
 			threw = true;
 		}
@@ -810,19 +810,19 @@ await describe('hosted handle', () => {
 	}, { retry: 2 });
 
 	test('pid is a number', () => {
-		const handle = spawnHosted('process.exit(0)');
-		handle.onData(() => {});
-		handle.onExit(() => {});
-		expect(typeof handle.pid).toBe('number');
-		expect(handle.pid > 0).toBe(true);
+		const ptyProcess = spawnHosted('process.exit(0)');
+		ptyProcess.onData(() => {});
+		ptyProcess.onExit(() => {});
+		expect(typeof ptyProcess.pid).toBe('number');
+		expect(ptyProcess.pid > 0).toBe(true);
 	});
 
 	test('write and kill after exit do not throw', async () => {
-		const handle = spawnHosted('process.exit(0)');
+		const ptyProcess = spawnHosted('process.exit(0)');
 
 		const { promise, resolve } = Promise.withResolvers<void>();
-		handle.onData(() => {});
-		handle.onExit(() => {
+		ptyProcess.onData(() => {});
+		ptyProcess.onExit(() => {
 			resolve();
 		});
 
@@ -831,9 +831,9 @@ await describe('hosted handle', () => {
 
 		let threw = false;
 		try {
-			handle.write('data');
-			handle.kill();
-			handle.resize(80, 24);
+			ptyProcess.write('data');
+			ptyProcess.kill();
+			ptyProcess.resize(80, 24);
 		} catch {
 			threw = true;
 		}
@@ -841,12 +841,12 @@ await describe('hosted handle', () => {
 	}, { retry: 2 });
 
 	test('exit fires only once even with IPC exit and child exit', async () => {
-		const handle = spawnHosted('process.exit(0)');
+		const ptyProcess = spawnHosted('process.exit(0)');
 
 		let exitCount = 0;
 		const { promise, resolve } = Promise.withResolvers<void>();
-		handle.onData(() => {});
-		handle.onExit(() => {
+		ptyProcess.onData(() => {});
+		ptyProcess.onExit(() => {
 			exitCount += 1;
 			resolve();
 		});

@@ -1,7 +1,7 @@
 import { EventEmitter, on } from 'node:events';
 import { constants as osConstants } from 'node:os';
 import type { IPtyForkOptions } from 'node-pty';
-import { createPtyHandle } from './pty-bridge.ts';
+import { createPtyProcess } from './pty-bridge.ts';
 
 export type Result = {
 	output: string;
@@ -124,7 +124,7 @@ export function spawn(
 	}
 
 	const startedAt = Date.now();
-	const handle = createPtyHandle(file, args, {
+	const ptyProcess = createPtyProcess(file, args, {
 		...ptyOptions,
 		cols: window?.cols,
 		rows: window?.rows,
@@ -154,7 +154,7 @@ export function spawn(
 
 	const safeKill = (killSignal?: string) => {
 		try {
-			handle.kill(killSignal);
+			ptyProcess.kill(killSignal);
 		} catch {}
 	};
 
@@ -237,7 +237,7 @@ export function spawn(
 		signal?.addEventListener('abort', onAbort, { once: true });
 	}
 
-	handle.onData((data) => {
+	ptyProcess.onData((data) => {
 		lastDataAt = Date.now();
 		output += data;
 		emitter.emit('data', data);
@@ -247,7 +247,7 @@ export function spawn(
 		}
 	});
 
-	handle.onExit(({ exitCode: nextExitCode, signal: exitSignal }) => {
+	ptyProcess.onExit(({ exitCode: nextExitCode, signal: exitSignal }) => {
 		exitCode = nextExitCode;
 		exitSignalName = getSignalName(exitSignal);
 		emitter.emit('exit', nextExitCode);
@@ -306,16 +306,16 @@ export function spawn(
 		}
 	};
 	const subprocess = Object.assign(resultPromise, {
-		pid: handle.pid,
+		pid: ptyProcess.pid,
 		kill,
 		resize: (cols: number, rows: number) => {
 			try {
-				handle.resize(cols, rows);
+				ptyProcess.resize(cols, rows);
 			} catch {}
 		},
 		stdin: {
 			write: (data: string) => {
-				handle.write(data);
+				ptyProcess.write(data);
 			},
 		},
 		[Symbol.asyncIterator]: iterateOutput,

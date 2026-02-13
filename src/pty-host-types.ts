@@ -1,6 +1,6 @@
 import type { IPtyForkOptions } from 'node-pty';
 
-export type HostMessage =
+export type HostCommand =
 	| {
 		type: 'spawn';
 		file: string;

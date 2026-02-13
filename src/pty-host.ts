@@ -1,9 +1,9 @@
 import nodePty, { type IPty } from 'node-pty';
-import type { HostMessage } from './pty-host-types.ts';
+import type { HostCommand } from './pty-host-types.ts';
 
 let pty: IPty | undefined;
 
-process.on('message', (message: HostMessage) => {
+process.on('message', (message: HostCommand) => {
 	switch (message.type) {
 		case 'spawn': {
 			pty = nodePty.spawn(message.file, message.args, message.options);

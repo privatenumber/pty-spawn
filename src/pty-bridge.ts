@@ -9,7 +9,7 @@ type ExitEvent = {
 	signal?: number;
 };
 
-type PtyHandle = {
+type PtyProcess = {
 	pid: number;
 	onData: (callback: (data: string) => void) => void;
 	onExit: (callback: (event: ExitEvent) => void) => void;
@@ -23,11 +23,11 @@ type PtyHandle = {
 // https://github.com/microsoft/node-pty/issues/437
 // Isolating node-pty in a child process lets us force-exit the child, keeping
 // the parent's event loop clean.
-export const createHostedHandle = (
+export const createHostedPtyProcess = (
 	file: string,
 	args: string[],
 	options: IPtyForkOptions,
-): PtyHandle => {
+): PtyProcess => {
 	const hostScriptPath = fileURLToPath(import.meta.resolve('#pty-host'));
 	// stdio fds: 0=stdin, 1=stdout, 2=stderr (all ignored), 3=ipc
 	// All communication goes through IPC; child's stdout/stderr are suppressed
@@ -49,7 +49,7 @@ export const createHostedHandle = (
 
 	// Guard against multiple exit sources: IPC 'exit' message, child 'exit'
 	// event, and child 'error' event can all fire — only the first one counts
-	const fireExit = (event: ExitEvent) => {
+	const emitExit = (event: ExitEvent) => {
 		if (exitFired) {
 			return;
 		}
@@ -61,7 +61,7 @@ export const createHostedHandle = (
 		if (message.type === 'data') {
 			dataCallback(message.data);
 		} else if (message.type === 'exit') {
-			fireExit({
+			emitExit({
 				exitCode: message.exitCode,
 				signal: message.signal,
 			});
@@ -71,11 +71,11 @@ export const createHostedHandle = (
 	// child.send() both throws AND emits 'error' when IPC channel closes.
 	// Without this handler, the error is unhandled and crashes the parent.
 	child.on('error', () => {
-		fireExit({ exitCode: 1 });
+		emitExit({ exitCode: 1 });
 	});
 
 	child.on('exit', (code) => {
-		fireExit({ exitCode: code ?? 1 });
+		emitExit({ exitCode: code ?? 1 });
 	});
 
 	return {
@@ -119,6 +119,12 @@ export const createHostedHandle = (
 	};
 };
 
-export const createPtyHandle = process.platform === 'win32'
-	? createHostedHandle
-	: (await import('node-pty')).spawn;
+// On non-Windows, use node-pty directly (no overhead). The ternary
+// short-circuits so node-pty is never imported on Windows.
+const nodePty = process.platform === 'win32'
+	? undefined
+	: await import('node-pty');
+
+export const createPtyProcess = process.platform === 'win32'
+	? createHostedPtyProcess
+	: nodePty!.spawn;
