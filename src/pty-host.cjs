@@ -1,8 +1,8 @@
 /* eslint-disable */
+const nodePty = require('node-pty');
 let pty;
 process.on('message', (msg) => {
 	if (msg.type === 'spawn') {
-		const nodePty = require(msg.nodePtyPath);
 		pty = nodePty.spawn(msg.file, msg.args, msg.options);
 		pty.onData((data) => {
 			try { process.send({ type: 'data', data }); } catch {}

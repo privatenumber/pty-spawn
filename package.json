@@ -28,6 +28,10 @@
 		"#pty-spawn": {
 			"dev": "./src/index.ts",
 			"default": "./dist/index.mjs"
+		},
+		"#pty-host": {
+			"dev": "./src/pty-host.cjs",
+			"default": "./dist/pty-host.cjs"
 		}
 	},
 	"packageManager": "pnpm@10.19.0",

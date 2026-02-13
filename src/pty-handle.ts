@@ -1,7 +1,7 @@
 import { spawn as cpSpawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import type { IPty, IPtyForkOptions } from 'node-pty';
-import hostScript from './pty-host.cjs' with { type: 'text' };
 
 type ExitEvent = {
 	exitCode: number;
@@ -27,22 +27,20 @@ const createDirectHandle = (
 	return nodePty.spawn(file, args, options) as unknown as PtyHandle;
 };
 
+const hostScriptPath = fileURLToPath(import.meta.resolve('#pty-host'));
+
 const createHostedHandle = (
 	file: string,
 	args: string[],
 	options: IPtyForkOptions,
 ): PtyHandle => {
-	const esmRequire = createRequire(import.meta.url);
-	const nodePtyPath = esmRequire.resolve('node-pty');
-
-	const child = cpSpawn(process.execPath, ['--no-warnings', '-e', hostScript], {
+	const child = cpSpawn(process.execPath, ['--no-warnings', hostScriptPath], {
 		stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
 		windowsHide: true,
 	});
 
 	child.send({
 		type: 'spawn',
-		nodePtyPath,
 		file,
 		args,
 		options,
