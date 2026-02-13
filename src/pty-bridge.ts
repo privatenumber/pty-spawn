@@ -119,12 +119,6 @@ export const createHostedPtyProcess = (
 	};
 };
 
-// On non-Windows, use node-pty directly (no overhead). The ternary
-// short-circuits so node-pty is never imported on Windows.
-const nodePty = process.platform === 'win32'
-	? undefined
-	: await import('node-pty');
-
 export const createPtyProcess = process.platform === 'win32'
 	? createHostedPtyProcess
-	: nodePty!.spawn;
+	: (await import('node-pty')).spawn;
