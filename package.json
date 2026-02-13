@@ -30,7 +30,7 @@
 			"default": "./dist/index.mjs"
 		},
 		"#pty-host": {
-			"dev": "./src/pty-host.mjs",
+			"dev": "./src/pty-host.ts",
 			"default": "./dist/pty-host.mjs"
 		}
 	},
@@ -39,7 +39,7 @@
 		"build": "pkgroll",
 		"dev": "node --watch -C dev tests/index.ts",
 		"test": "node tests/index.ts",
-		"lint": "lintroll --cache --git --node --ignore-pattern 'src/pty-host.mjs'",
+		"lint": "lintroll --cache --git --node",
 		"type-check": "tsc",
 		"prepack": "pnpm build && clean-pkg-json"
 	},

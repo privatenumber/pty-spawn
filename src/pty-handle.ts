@@ -1,6 +1,7 @@
 import { spawn as cpSpawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { IPtyForkOptions } from 'node-pty';
+import type { HostEvent } from './pty-ipc.ts';
 
 type ExitEvent = {
 	exitCode: number;
@@ -47,14 +48,13 @@ const createHostedHandle = (
 		exitCallback(event);
 	};
 
-	child.on('message', (message) => {
-		const message_ = message as Record<string, unknown>;
-		if (message_.type === 'data') {
-			dataCallback(message_.data as string);
-		} else if (message_.type === 'exit') {
+	child.on('message', (message: HostEvent) => {
+		if (message.type === 'data') {
+			dataCallback(message.data);
+		} else if (message.type === 'exit') {
 			fireExit({
-				exitCode: message_.exitCode as number,
-				signal: message_.signal as number | undefined,
+				exitCode: message.exitCode,
+				signal: message.signal,
 			});
 		}
 	});
