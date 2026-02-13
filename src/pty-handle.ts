@@ -16,11 +16,11 @@ export type PtyHandle = {
 	resize: (columns: number, rows: number) => void;
 };
 
-const buildHostScript = (nodePtyPath: string) => [
-	`const nodePty = require(${JSON.stringify(nodePtyPath)});`,
+const hostScript = [
 	'let pty;',
 	"process.on('message', (msg) => {",
 	"  if (msg.type === 'spawn') {",
+	'    const nodePty = require(msg.nodePtyPath);',
 	'    pty = nodePty.spawn(msg.file, msg.args, msg.options);',
 	'    pty.onData((data) => {',
 	"      try { process.send({ type: 'data', data }); } catch {}",
@@ -76,7 +76,6 @@ const createHostedHandle = (
 ): PtyHandle => {
 	const esmRequire = createRequire(import.meta.url);
 	const nodePtyPath = esmRequire.resolve('node-pty');
-	const hostScript = buildHostScript(nodePtyPath);
 
 	const child = cpSpawn(process.execPath, ['--no-warnings', '-e', hostScript], {
 		stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
@@ -85,6 +84,7 @@ const createHostedHandle = (
 
 	child.send({
 		type: 'spawn',
+		nodePtyPath,
 		file,
 		args,
 		options,
