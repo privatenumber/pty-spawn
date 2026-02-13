@@ -1,5 +1,5 @@
 import nodePty, { type IPty } from 'node-pty';
-import type { HostMessage } from './pty-ipc.ts';
+import type { HostMessage } from './pty-host-types.ts';
 
 let pty: IPty | undefined;
 
