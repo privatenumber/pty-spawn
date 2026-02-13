@@ -121,4 +121,4 @@ export const createHostedPtyProcess = (
 
 export const createPtyProcess = process.platform === 'win32'
 	? createHostedPtyProcess
-	: (await import('node-pty')).spawn;
+	: await import('node-pty').then(({ spawn }) => spawn);
