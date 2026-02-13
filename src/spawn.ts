@@ -1,6 +1,7 @@
 import { EventEmitter, on } from 'node:events';
 import { constants as osConstants } from 'node:os';
-import { spawn as ptySpawn, type IPtyForkOptions } from 'node-pty';
+import type { IPtyForkOptions } from 'node-pty';
+import { createPtyProcess } from './pty-bridge.ts';
 
 export type Result = {
 	output: string;
@@ -123,7 +124,7 @@ export function spawn(
 	}
 
 	const startedAt = Date.now();
-	const ptyProcess = ptySpawn(file, args, {
+	const ptyProcess = createPtyProcess(file, args, {
 		...ptyOptions,
 		cols: window?.cols,
 		rows: window?.rows,

@@ -28,6 +28,10 @@
 		"#pty-spawn": {
 			"dev": "./src/index.ts",
 			"default": "./dist/index.mjs"
+		},
+		"#pty-host": {
+			"dev": "./src/pty-host.ts",
+			"default": "./dist/pty-host.mjs"
 		}
 	},
 	"packageManager": "pnpm@10.19.0",
@@ -51,7 +55,7 @@
 		"concurrently": "^9.2.1",
 		"lintroll": "^1.26.1",
 		"manten": "2.0.0-beta.2",
-		"pkgroll": "^2.21.5",
+		"pkgroll": "^2.25.1",
 		"typescript": "^5.9.3"
 	},
 	"pnpm": {
