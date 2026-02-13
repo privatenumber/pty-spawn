@@ -19,7 +19,8 @@ type PtyHandle = {
 };
 
 // On Windows, node-pty leaves un-unref'd handles (Worker, sockets, drain
-// timeouts) after kill(), preventing Node from exiting (microsoft/node-pty#437).
+// timeouts) after kill(), preventing Node from exiting.
+// https://github.com/microsoft/node-pty/issues/437
 // Isolating node-pty in a child process lets us force-exit the child, keeping
 // the parent's event loop clean.
 export const createHostedHandle = (
