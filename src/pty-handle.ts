@@ -8,7 +8,7 @@ type ExitEvent = {
 	signal?: number;
 };
 
-export type PtyHandle = {
+type PtyHandle = {
 	pid: number;
 	onData: (callback: (data: string) => void) => void;
 	onExit: (callback: (event: ExitEvent) => void) => void;
@@ -23,18 +23,8 @@ const createDirectHandle = (
 	options: IPtyForkOptions,
 ): PtyHandle => {
 	const esmRequire = createRequire(import.meta.url);
-	const nodePty = esmRequire('node-pty') as {
-		spawn(file: string, args: string[] | string, options: IPtyForkOptions): IPty;
-	};
-	const pty = nodePty.spawn(file, args, options);
-	return {
-		pid: pty.pid,
-		onData: (callback) => { pty.onData(callback); },
-		onExit: (callback) => { pty.onExit(callback); },
-		kill: (signal?) => { pty.kill(signal); },
-		write: (data) => { pty.write(data); },
-		resize: (columns, rows) => { pty.resize(columns, rows); },
-	};
+	const nodePty = esmRequire('node-pty') as { spawn(file: string, args: string[], options: IPtyForkOptions): IPty };
+	return nodePty.spawn(file, args, options) as unknown as PtyHandle;
 };
 
 const createHostedHandle = (
@@ -58,10 +48,8 @@ const createHostedHandle = (
 		options,
 	});
 
-	let dataCallback: ((data: string) => void) | undefined;
-	let exitCallback: ((event: ExitEvent) => void) | undefined;
-	const dataBuffer: string[] = [];
-	let exitEvent: ExitEvent | undefined;
+	let dataCallback: (data: string) => void;
+	let exitCallback: (event: ExitEvent) => void;
 	let exitFired = false;
 
 	const fireExit = (event: ExitEvent) => {
@@ -69,22 +57,13 @@ const createHostedHandle = (
 			return;
 		}
 		exitFired = true;
-		if (exitCallback) {
-			exitCallback(event);
-			return;
-		}
-		exitEvent = event;
+		exitCallback(event);
 	};
 
 	child.on('message', (message) => {
 		const message_ = message as Record<string, unknown>;
 		if (message_.type === 'data') {
-			const data = message_.data as string;
-			if (dataCallback) {
-				dataCallback(data);
-			} else {
-				dataBuffer.push(data);
-			}
+			dataCallback(message_.data as string);
 		} else if (message_.type === 'exit') {
 			fireExit({
 				exitCode: message_.exitCode as number,
@@ -101,16 +80,8 @@ const createHostedHandle = (
 		pid: child.pid!,
 		onData: (callback) => {
 			dataCallback = callback;
-			for (const data of dataBuffer) {
-				callback(data);
-			}
-			dataBuffer.length = 0;
 		},
 		onExit: (callback) => {
-			if (exitEvent) {
-				callback(exitEvent);
-				return;
-			}
 			exitCallback = callback;
 		},
 		kill: (signal?) => {

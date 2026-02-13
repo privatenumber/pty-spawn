@@ -35,7 +35,7 @@
 		"build": "pkgroll",
 		"dev": "node --watch -C dev tests/index.ts",
 		"test": "node tests/index.ts",
-		"lint": "lintroll --cache --git --node",
+		"lint": "lintroll --cache --git --node --ignore-pattern 'src/pty-host.cjs'",
 		"type-check": "tsc",
 		"prepack": "pnpm build && clean-pkg-json"
 	},

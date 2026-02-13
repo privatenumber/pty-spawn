@@ -26,6 +26,5 @@ process.on('disconnect', () => {
 });
 process.on('uncaughtException', (error) => {
 	if (error.message === 'Signals not supported on windows.' || error.message === 'AttachConsole failed') return;
-	try { process.send({ type: 'error', message: error.message }); } catch {}
 	process.exit(1);
 });
