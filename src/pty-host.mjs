@@ -1,5 +1,5 @@
 /* eslint-disable */
-const nodePty = require('node-pty');
+import nodePty from 'node-pty';
 let pty;
 process.on('message', (msg) => {
 	if (msg.type === 'spawn') {

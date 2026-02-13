@@ -1,7 +1,6 @@
 import { spawn as cpSpawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
-import type { IPty, IPtyForkOptions } from 'node-pty';
+import type { IPtyForkOptions } from 'node-pty';
 
 type ExitEvent = {
 	exitCode: number;
@@ -15,16 +14,6 @@ type PtyHandle = {
 	kill: (signal?: string) => void;
 	write: (data: string) => void;
 	resize: (columns: number, rows: number) => void;
-};
-
-const createDirectHandle = (
-	file: string,
-	args: string[],
-	options: IPtyForkOptions,
-): PtyHandle => {
-	const esmRequire = createRequire(import.meta.url);
-	const nodePty = esmRequire('node-pty') as { spawn(file: string, args: string[], options: IPtyForkOptions): IPty };
-	return nodePty.spawn(file, args, options) as unknown as PtyHandle;
 };
 
 const hostScriptPath = fileURLToPath(import.meta.resolve('#pty-host'));
@@ -116,6 +105,10 @@ const createHostedHandle = (
 	};
 };
 
+const nodePty = process.platform === 'win32'
+	? undefined
+	: await import('node-pty');
+
 export const createPtyHandle = process.platform === 'win32'
 	? createHostedHandle
-	: createDirectHandle;
+	: nodePty!.spawn;
