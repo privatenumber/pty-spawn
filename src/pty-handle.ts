@@ -1,11 +1,16 @@
 import { spawn as cpSpawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import type { IPtyForkOptions } from 'node-pty';
+import type { IPty, IPtyForkOptions } from 'node-pty';
+
+type ExitEvent = {
+	exitCode: number;
+	signal?: number;
+};
 
 export type PtyHandle = {
 	pid: number;
 	onData: (callback: (data: string) => void) => void;
-	onExit: (callback: (event: { exitCode: number; signal?: number }) => void) => void;
+	onExit: (callback: (event: ExitEvent) => void) => void;
 	kill: (signal?: string) => void;
 	write: (data: string) => void;
 	resize: (columns: number, rows: number) => void;
@@ -50,7 +55,9 @@ const createDirectHandle = (
 	options: IPtyForkOptions,
 ): PtyHandle => {
 	const esmRequire = createRequire(import.meta.url);
-	const nodePty: typeof import('node-pty') = esmRequire('node-pty');
+	const nodePty = esmRequire('node-pty') as {
+		spawn(file: string, args: string[] | string, options: IPtyForkOptions): IPty;
+	};
 	const pty = nodePty.spawn(file, args, options);
 	return {
 		pid: pty.pid,
@@ -76,15 +83,20 @@ const createHostedHandle = (
 		windowsHide: true,
 	});
 
-	child.send({ type: 'spawn', file, args, options });
+	child.send({
+		type: 'spawn',
+		file,
+		args,
+		options,
+	});
 
 	let dataCallback: ((data: string) => void) | undefined;
-	let exitCallback: ((event: { exitCode: number; signal?: number }) => void) | undefined;
+	let exitCallback: ((event: ExitEvent) => void) | undefined;
 	const dataBuffer: string[] = [];
-	let exitEvent: { exitCode: number; signal?: number } | undefined;
+	let exitEvent: ExitEvent | undefined;
 	let exitFired = false;
 
-	const fireExit = (event: { exitCode: number; signal?: number }) => {
+	const fireExit = (event: ExitEvent) => {
 		if (exitFired) {
 			return;
 		}
@@ -97,18 +109,18 @@ const createHostedHandle = (
 	};
 
 	child.on('message', (message) => {
-		const msg = message as Record<string, unknown>;
-		if (msg.type === 'data') {
-			const data = msg.data as string;
+		const message_ = message as Record<string, unknown>;
+		if (message_.type === 'data') {
+			const data = message_.data as string;
 			if (dataCallback) {
 				dataCallback(data);
 			} else {
 				dataBuffer.push(data);
 			}
-		} else if (msg.type === 'exit') {
+		} else if (message_.type === 'exit') {
 			fireExit({
-				exitCode: msg.exitCode as number,
-				signal: msg.signal as number | undefined,
+				exitCode: message_.exitCode as number,
+				signal: message_.signal as number | undefined,
 			});
 		}
 	});
@@ -135,21 +147,33 @@ const createHostedHandle = (
 		},
 		kill: (signal?) => {
 			try {
-				child.send({ type: 'kill', signal });
+				child.send({
+					type: 'kill',
+					signal,
+				});
 			} catch {}
 			const timer = setTimeout(() => {
-				try { child.kill(); } catch {}
+				try {
+					child.kill();
+				} catch {}
 			}, 5000);
 			timer.unref();
 		},
 		write: (data) => {
 			try {
-				child.send({ type: 'write', data });
+				child.send({
+					type: 'write',
+					data,
+				});
 			} catch {}
 		},
 		resize: (columns, rows) => {
 			try {
-				child.send({ type: 'resize', cols: columns, rows });
+				child.send({
+					type: 'resize',
+					cols: columns,
+					rows,
+				});
 			} catch {}
 		},
 	};
