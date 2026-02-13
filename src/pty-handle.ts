@@ -1,6 +1,7 @@
 import { spawn as cpSpawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import type { IPty, IPtyForkOptions } from 'node-pty';
+import hostScript from './pty-host.cjs' with { type: 'text' };
 
 type ExitEvent = {
 	exitCode: number;
@@ -15,39 +16,6 @@ export type PtyHandle = {
 	write: (data: string) => void;
 	resize: (columns: number, rows: number) => void;
 };
-
-const hostScript = [
-	'let pty;',
-	"process.on('message', (msg) => {",
-	"  if (msg.type === 'spawn') {",
-	'    const nodePty = require(msg.nodePtyPath);',
-	'    pty = nodePty.spawn(msg.file, msg.args, msg.options);',
-	'    pty.onData((data) => {',
-	"      try { process.send({ type: 'data', data }); } catch {}",
-	'    });',
-	'    pty.onExit((e) => {',
-	'      try {',
-	"        process.send({ type: 'exit', exitCode: e.exitCode, signal: e.signal }, () => process.exit());",
-	'      } catch { process.exit(); }',
-	'    });',
-	"  } else if (msg.type === 'write') {",
-	'    try { pty.write(msg.data); } catch {}',
-	"  } else if (msg.type === 'kill') {",
-	'    try { pty.kill(msg.signal); } catch {}',
-	"  } else if (msg.type === 'resize') {",
-	'    try { pty.resize(msg.cols, msg.rows); } catch {}',
-	'  }',
-	'});',
-	"process.on('disconnect', () => {",
-	'  if (pty) { try { pty.kill(); } catch {} }',
-	'  process.exit();',
-	'});',
-	"process.on('uncaughtException', (error) => {",
-	"  if (error.message === 'Signals not supported on windows.' || error.message === 'AttachConsole failed') return;",
-	"  try { process.send({ type: 'error', message: error.message }); } catch {}",
-	'  process.exit(1);',
-	'});',
-].join('\n');
 
 const createDirectHandle = (
 	file: string,
