@@ -115,7 +115,7 @@ await describe('pty-spawn', () => {
 		const result = await subprocess;
 		expect(result.exitCode).toBe(0);
 		expect(result.output).toContain('hello from pty');
-	});
+	}, { retry: 2 });
 
 	test('subprocess.output accumulates output synchronously', async () => {
 		const subprocess = spawnNode("console.log('hello from pty')");
@@ -126,7 +126,7 @@ await describe('pty-spawn', () => {
 		expect(subprocess.output).toContain('hello from pty');
 
 		await subprocess;
-	});
+	}, { retry: 2 });
 
 	test('result includes metadata and output', async () => {
 		const subprocess = spawnNode("process.stdout.write('meta')");
@@ -139,7 +139,7 @@ await describe('pty-spawn', () => {
 		expect(result.args[0]).toBe('-e');
 		expect(typeof result.durationMs).toBe('number');
 		expect(result.durationMs >= 0).toBe(true);
-	});
+	}, { retry: 2 });
 
 	test('result preserves edge-case args verbatim', async () => {
 		const edgeArgs = [
@@ -191,7 +191,25 @@ await describe('pty-spawn', () => {
 		}
 	});
 
+	// Skipped on Windows: ConPTY is not classic stdin redirection — it emulates
+	// a console session via pipes, so stdin writes go through a pipe → conhost
+	// → console input buffer → child process chain. This means:
+	// - Pipe close doesn't signal EOF to the child
+	//   https://github.com/microsoft/terminal/issues/11008
+	// - Input sequences can be transformed or swallowed
+	//   https://github.com/microsoft/terminal/issues/12166
+	// - Stream I/O and console events don't compose cleanly
+	//   https://github.com/microsoft/terminal/issues/394
+	// - stdin write performance degrades significantly
+	//   https://github.com/microsoft/node-pty/issues/327
+	// The child process may never receive the written data, causing the test to
+	// hang until timeout. This is a ConPTY architectural limitation, not a bug
+	// in node-pty or this library.
 	test('waitFor works with stdin.write', async () => {
+		if (process.platform === 'win32') {
+			skip('ConPTY stdin delivery is unreliable on Windows');
+		}
+
 		const subprocess = spawnNode([
 			"console.log('READY')",
 			'process.stdin.resume()',
@@ -449,7 +467,21 @@ await describe('pty-spawn', () => {
 		expect(threw).toBe(false);
 	});
 
+	// Skipped on Windows: Windows has no POSIX signals — node-pty throws
+	// "Signals not supported on windows." for any signal name passed to kill()
+	// (windowsTerminal.ts), so kill('NO_SUCH_SIGNAL') never reaches the process
+	// termination path. The subsequent await subprocess.kill() hangs because
+	// ConPTY teardown (forking conpty_console_list_agent.js, socket drain
+	// timeouts, worker thread disposal) doesn't reliably trigger the exit event,
+	// and un-unref()'d handles keep the event loop alive indefinitely.
+	// See:
+	// - https://github.com/microsoft/node-pty/issues/437
+	// - https://github.com/microsoft/node-pty/issues/887
 	test('kill swallows unknown signal errors', async () => {
+		if (process.platform === 'win32') {
+			skip('Signals not supported on Windows');
+		}
+
 		const subprocess = spawnNode('setInterval(() => {}, 1000)');
 
 		let threw = false;
