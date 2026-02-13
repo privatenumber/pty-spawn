@@ -28,8 +28,8 @@ importers:
         specifier: 2.0.0-beta.2
         version: 2.0.0-beta.2
       pkgroll:
-        specifier: ^2.25.0
-        version: 2.25.0(typescript@5.9.3)
+        specifier: ^2.25.1
+        version: 2.25.1(typescript@5.9.3)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -2217,8 +2217,8 @@ packages:
     resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
     engines: {node: '>=12'}
 
-  pkgroll@2.25.0:
-    resolution: {integrity: sha512-RKrNf6uqoD4z+yKpZwdjVxtsTvr4a/MqVYtulnkFBGFKtBlLFrDU/8bYs8xOfoUL8qXm2glrKPlNZIobgkBI3Q==}
+  pkgroll@2.25.1:
+    resolution: {integrity: sha512-PbyZauePUhDgNIDSDPgchCjPiffs2RYxaEFRP//uAhlg2R5xtrCaeTfZqbFQ6Ru5C26LioQGhymkPk7ahisHeg==}
     engines: {node: '>=18'}
     hasBin: true
     peerDependencies:
@@ -5170,7 +5170,7 @@ snapshots:
 
   picomatch@4.0.3: {}
 
-  pkgroll@2.25.0(typescript@5.9.3):
+  pkgroll@2.25.1(typescript@5.9.3):
     dependencies:
       '@rollup/plugin-alias': 6.0.0(rollup@4.57.1)
       '@rollup/plugin-commonjs': 29.0.0(rollup@4.57.1)

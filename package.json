@@ -51,7 +51,7 @@
 		"concurrently": "^9.2.1",
 		"lintroll": "^1.26.1",
 		"manten": "2.0.0-beta.2",
-		"pkgroll": "^2.25.0",
+		"pkgroll": "^2.25.1",
 		"typescript": "^5.9.3"
 	},
 	"pnpm": {
