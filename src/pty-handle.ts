@@ -59,6 +59,8 @@ const createHostedHandle = (
 		}
 	});
 
+	child.on('error', () => {});
+
 	child.on('exit', (code) => {
 		fireExit({ exitCode: code ?? 1 });
 	});
