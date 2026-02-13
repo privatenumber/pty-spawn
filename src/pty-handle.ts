@@ -73,12 +73,9 @@ const createHostedHandle = (
 		onExit: (callback) => {
 			exitCallback = callback;
 		},
-		kill: (signal?) => {
+		kill: () => {
 			try {
-				child.send({
-					type: 'kill',
-					signal,
-				});
+				child.send({ type: 'kill' });
 			} catch {}
 			const timer = setTimeout(() => {
 				try {

@@ -43,7 +43,7 @@ process.on('message', (message: HostMessage) => {
 		}
 		case 'kill': {
 			try {
-				pty?.kill(message.signal);
+				pty?.kill();
 			} catch {}
 
 			break;

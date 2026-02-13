@@ -13,7 +13,6 @@ export type HostMessage =
 	}
 	| {
 		type: 'kill';
-		signal?: string;
 	}
 	| {
 		type: 'resize';
