@@ -1,7 +1,7 @@
 import { EventEmitter, on } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
-	describe, test, expect, skip, setProcessTimeout,
+	describe, test, expect, skip,
 } from 'manten';
 import {
 	spawn,
@@ -11,28 +11,6 @@ import {
 	type Result,
 	type Subprocess,
 } from '#pty-spawn';
-
-// Workaround for node-pty Windows issues:
-// https://github.com/microsoft/node-pty/issues/887
-//
-// node-pty on Windows has unhandled errors in its internal conpty cleanup:
-// - "Signals not supported on windows" from deferred kill() calls
-// - "AttachConsole failed" from conpty_console_list_agent.js
-// These crash the process if not caught. Swallow them during tests.
-// Additionally, node-pty leaves background conpty agents that prevent clean exit,
-// so we force exit after a generous timeout.
-if (process.platform === 'win32') {
-	process.on('uncaughtException', (error) => {
-		const { message } = error;
-		if (message === 'Signals not supported on windows.' || message === 'AttachConsole failed') {
-			return;
-		}
-		console.error('Uncaught exception:', error); // eslint-disable-line no-console
-		process.exit(1); // eslint-disable-line n/no-process-exit
-	});
-
-	setProcessTimeout(10 * 60 * 1000);
-}
 
 const defaultWindow = {
 	cols: 80,
@@ -706,10 +684,3 @@ await describe('pty-spawn', () => {
 		expect(result.exitCode).toBeDefined();
 	});
 });
-
-// node-pty on Windows leaves background conpty agents that keep the event
-// loop alive indefinitely. Force exit so CI doesn't hang after tests complete.
-// https://github.com/microsoft/node-pty/issues/887
-if (process.platform === 'win32') {
-	process.exit(); // eslint-disable-line n/no-process-exit
-}
