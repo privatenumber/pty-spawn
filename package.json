@@ -34,7 +34,7 @@
 			"default": "./dist/pty-host.mjs"
 		}
 	},
-	"packageManager": "pnpm@10.19.0",
+	"packageManager": "pnpm@10.33.2",
 	"scripts": {
 		"build": "pkgroll",
 		"dev": "node --watch -C dev tests/index.ts",
