@@ -18,14 +18,23 @@ const defaultOptions = {
 	rows: 24,
 } as const;
 
+type PtyCommand = string | {
+	file: string;
+	args: string[];
+};
+
 const observePtyProcess = (
 	createPtyProcess: PtyProcessFactory,
-	script: string,
+	command: PtyCommand,
 	onData?: (ptyProcess: PtyProcess, output: string) => void,
 ) => {
+	const file = typeof command === 'string' ? process.execPath : command.file;
+	const args = typeof command === 'string'
+		? ['--no-warnings', '-e', command]
+		: command.args;
 	const ptyProcess = createPtyProcess(
-		process.execPath,
-		['--no-warnings', '-e', script],
+		file,
+		args,
 		defaultOptions,
 	);
 	const state: {
@@ -63,23 +72,33 @@ const testPtyBackendContract = (
 	}
 
 	test('captures complete output from an immediate exit', async () => {
-		const expectedOutput = `BEGIN:${'x'.repeat(128 * 1024)}:END`;
+		const expectedLines = Array.from(
+			{ length: 2048 },
+			(_, index) => `LINE-${index.toString().padStart(4, '0')}:${'x'.repeat(48)}`,
+		);
 		const { ptyProcess, state, exitPromise } = observePtyProcess(
 			createPtyProcess,
-			"process.stdout.write('BEGIN:' + 'x'.repeat(128 * 1024) + ':END'); process.exitCode = 42",
+			[
+				'for (let index = 0; index < 2048; index += 1) {',
+				"process.stdout.write(`LINE-${index.toString().padStart(4, '0')}:${'x'.repeat(48)}\\n`)",
+				'}',
+				'process.exitCode = 42',
+			].join(';'),
 		);
 
 		const exitEvent = await exitPromise;
-		const normalizedOutput = state.output.replaceAll(/\r|\n/g, '');
+		const matches = state.output.match(/LINE-\d{4}:x{48}/g);
+		const observedLines = matches ? new Set(matches) : new Set<string>();
+		const missingLines = expectedLines.filter(line => !observedLines.has(line));
 
 		expect(ptyProcess.pid > 0).toBe(true);
 		expect(exitEvent.exitCode).toBe(42);
 		expect({
-			length: normalizedOutput.length,
-			isComplete: normalizedOutput === expectedOutput,
+			lineCount: observedLines.size,
+			missingLines: missingLines.slice(0, 10),
 		}).toEqual({
-			length: expectedOutput.length,
-			isComplete: true,
+			lineCount: expectedLines.length,
+			missingLines: [],
 		});
 	}, {
 		timeout: 30_000,
@@ -117,10 +136,26 @@ const testPtyBackendContract = (
 	});
 
 	test('resizes the PTY', async () => {
-		let resized = false;
-		const { state, exitPromise } = observePtyProcess(
-			createPtyProcess,
-			[
+		const resizeCommand: PtyCommand = process.platform === 'win32'
+			? {
+				file: 'powershell.exe',
+				args: [
+					'-NoLogo',
+					'-NoProfile',
+					'-Command',
+					[
+						'$deadline = (Get-Date).AddSeconds(5)',
+						'do {',
+						'$size = $Host.UI.RawUI.WindowSize',
+						'Write-Output "SIZE:$($size.Width)x$($size.Height)"',
+						'if ($size.Width -eq 100 -and $size.Height -eq 40) { exit 0 }',
+						'Start-Sleep -Milliseconds 50',
+						'} while ((Get-Date) -lt $deadline)',
+						'exit 2',
+					].join(';'),
+				],
+			}
+			: [
 				'const reportSize = () => {',
 				"console.log('SIZE:' + process.stdout.columns + 'x' + process.stdout.rows)",
 				'if (process.stdout.columns === 100 && process.stdout.rows === 40) process.exit(0)',
@@ -128,7 +163,11 @@ const testPtyBackendContract = (
 				'reportSize()',
 				'setInterval(reportSize, 50)',
 				'setTimeout(() => process.exit(2), 5000)',
-			].join(';'),
+			].join(';');
+		let resized = false;
+		const { state, exitPromise } = observePtyProcess(
+			createPtyProcess,
+			resizeCommand,
 			(ptyProcess, output) => {
 				if (!resized && output.includes('SIZE:80x24')) {
 					resized = true;
