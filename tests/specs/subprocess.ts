@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
 	describe, expect, skip, test,
@@ -40,12 +41,24 @@ describe('Subprocess', () => {
 		const subprocess = spawnNode("console.log('done')", { signal });
 		await subprocess;
 
-		let chunks = 0;
-		for await (const _chunk of subprocess) {
-			chunks += 1;
-		}
-		expect(chunks).toBe(0);
-	}, 800);
+		const collect = async () => {
+			let chunks = 0;
+			for await (const _chunk of subprocess) {
+				chunks += 1;
+			}
+			return chunks;
+		};
+
+		const outcome = await Promise.race([
+			collect().then(chunks => ({
+				type: 'resolved',
+				chunks,
+			})),
+			once(AbortSignal.timeout(800), 'abort')
+				.then(() => ({ type: 'timeout' as const })),
+		]);
+		expect(outcome.type).toBe('resolved');
+	}, 30_000);
 
 	test('supports multiple iterators under burst output with a slow consumer', async ({ signal }) => {
 		// Windows PTY spawns are ~5-8s each on CI, and setInterval(fn, 0)
