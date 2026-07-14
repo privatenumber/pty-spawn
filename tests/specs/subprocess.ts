@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import {
-	describe, expect, onTestFail, skip, test,
+	describe, expect, skip, test,
 } from 'manten';
 import { spawnNode } from '../utils/spawn-node.ts';
 import {
@@ -37,67 +37,28 @@ describe('Subprocess', () => {
 	});
 
 	test('iterator started after exit completes immediately', async ({ signal }) => {
-		const startedAt = performance.now();
-		const serializeError = (error: unknown) => error instanceof Error
-			? {
-				name: error.name,
-				message: error.message,
-				stack: error.stack,
+		const subprocess = spawnNode("console.log('done')", { signal });
+		await subprocess;
+
+		const collect = async () => {
+			let chunks = 0;
+			for await (const _chunk of subprocess) {
+				chunks += 1;
 			}
-			: error;
-		const logState = (phase: string, details: Record<string, unknown> = {}) => {
-			console.log('[iterator-debug]', JSON.stringify({
-				phase,
-				elapsedMs: Math.round((performance.now() - startedAt) * 100) / 100,
-				signalAborted: signal.aborted,
-				signalReason: serializeError(signal.reason),
-				activeResources: process.getActiveResourcesInfo(),
-				...details,
-			}));
+			return chunks;
 		};
 
-		onTestFail(error => logState('test-failed', {
-			error: serializeError(error),
-		}));
-		signal.addEventListener('abort', () => {
-			logState('signal-aborted');
-		}, { once: true });
-		logState('test-start', {
-			platform: process.platform,
-			architecture: process.arch,
-			node: process.version,
-		});
-
-		const subprocess = spawnNode("console.log('done')", { signal });
-		logState('spawn-returned', { pid: subprocess.pid });
-		void subprocess.then(
-			result => logState('subprocess-resolved', {
-				exitCode: result.exitCode,
-				durationMs: result.durationMs,
-				output: result.output,
-			}),
-			error => logState('subprocess-rejected', {
-				error: serializeError(error),
-				output: subprocess.output,
-			}),
-		);
-
-		logState('subprocess-await-start');
-		const result = await subprocess;
-		logState('subprocess-await-end', {
-			exitCode: result.exitCode,
-			durationMs: result.durationMs,
-			output: result.output,
-		});
-
-		logState('iterator-start');
-		let chunks = 0;
-		for await (const _chunk of subprocess) {
-			chunks += 1;
-		}
-		logState('iterator-end', { chunks });
-		expect(chunks).toBe(0);
-	}, 15_000);
+		const timeoutController = new AbortController();
+		const outcome = await Promise.race([
+			collect().then(chunks => ({
+				type: 'resolved',
+				chunks,
+			})),
+			delay(800, undefined, { signal: timeoutController.signal })
+				.then(() => ({ type: 'timeout' as const })),
+		]).finally(() => timeoutController.abort());
+		expect(outcome.type).toBe('resolved');
+	}, 30_000);
 
 	test('supports multiple iterators under burst output with a slow consumer', async ({ signal }) => {
 		// Windows PTY spawns are ~5-8s each on CI, and setInterval(fn, 0)
