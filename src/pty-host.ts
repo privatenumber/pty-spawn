@@ -2,34 +2,60 @@ import nodePty, { type IPty } from 'node-pty';
 import type { HostCommand } from './pty-host-types.ts';
 
 let pty: IPty | undefined;
+let pendingDataSends = 0;
+let pendingExit: {
+	exitCode: number;
+	signal?: number;
+} | undefined;
+
+const sendExit = () => {
+	if (!pendingExit || pendingDataSends > 0) {
+		return;
+	}
+
+	const event = pendingExit;
+	pendingExit = undefined;
+	try {
+		process.send!(
+			{
+				type: 'exit',
+				exitCode: event.exitCode,
+				signal: event.signal,
+			},
+			// eslint-disable-next-line n/no-process-exit
+			() => process.exit(),
+		);
+	} catch {
+		// eslint-disable-next-line n/no-process-exit
+		process.exit();
+	}
+};
 
 process.on('message', (message: HostCommand) => {
 	switch (message.type) {
 		case 'spawn': {
 			pty = nodePty.spawn(message.file, message.args, message.options);
 			pty.onData((data) => {
-				try {
-					process.send!({
-						type: 'data',
-						data,
-					});
-				} catch {}
-			});
-			pty.onExit((event) => {
+				pendingDataSends += 1;
 				try {
 					process.send!(
 						{
-							type: 'exit',
-							exitCode: event.exitCode,
-							signal: event.signal,
+							type: 'data',
+							data,
 						},
-						// eslint-disable-next-line n/no-process-exit
-						() => process.exit(),
+						() => {
+							pendingDataSends -= 1;
+							sendExit();
+						},
 					);
 				} catch {
-					// eslint-disable-next-line n/no-process-exit
-					process.exit();
+					pendingDataSends -= 1;
+					sendExit();
 				}
+			});
+			pty.onExit((event) => {
+				pendingExit = event;
+				sendExit();
 			});
 
 			break;

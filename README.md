@@ -74,7 +74,7 @@ A `Promise<Result>` with control properties attached.
 
 #### `stdin.write(data)`
 
-Write to the process stdin.
+Write to the process stdin. Safe to call after exit.
 
 ```ts
 subprocess.stdin.write('hello\n')
@@ -120,7 +120,8 @@ Supports [`await using`](https://github.com/tc39/proposal-explicit-resource-mana
 
 ### Result
 
-`await subprocess` resolves with:
+`await subprocess` resolves only after pending terminal output has been delivered, so
+`result.output` is complete when the promise settles:
 
 | Property | Type | Description |
 | --- | --- | --- |
