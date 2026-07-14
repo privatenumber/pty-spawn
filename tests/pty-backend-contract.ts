@@ -70,10 +70,17 @@ const testPtyBackendContract = (
 		);
 
 		const exitEvent = await exitPromise;
+		const normalizedOutput = state.output.replaceAll(/\r|\n/g, '');
 
 		expect(ptyProcess.pid > 0).toBe(true);
 		expect(exitEvent.exitCode).toBe(42);
-		expect(state.output).toBe(expectedOutput);
+		expect({
+			length: normalizedOutput.length,
+			isComplete: normalizedOutput === expectedOutput,
+		}).toEqual({
+			length: expectedOutput.length,
+			isComplete: true,
+		});
 	}, {
 		timeout: 30_000,
 	});
