@@ -36,31 +36,18 @@ describe('Subprocess', () => {
 		expect(streamed).toContain('beta');
 	});
 
-	test('iterator started after exit completes immediately', async () => {
-		const subprocess = spawnNode("console.log('done')");
+	test('iterator started after exit completes immediately', async ({ signal }) => {
+		const subprocess = spawnNode("console.log('done')", { signal });
 		await subprocess;
 
-		const collect = async () => {
-			let chunks = 0;
-			for await (const _chunk of subprocess) {
-				chunks += 1;
-			}
-			return chunks;
-		};
+		let chunks = 0;
+		for await (const _chunk of subprocess) {
+			chunks += 1;
+		}
+		expect(chunks).toBe(0);
+	}, 800);
 
-		const timeoutController = new AbortController();
-		const outcome = await Promise.race([
-			collect().then(chunks => ({
-				type: 'resolved',
-				chunks,
-			})),
-			delay(800, undefined, { signal: timeoutController.signal })
-				.then(() => ({ type: 'timeout' as const })),
-		]).finally(() => timeoutController.abort());
-		expect(outcome.type).toBe('resolved');
-	});
-
-	test('supports multiple iterators under burst output with a slow consumer', async () => {
+	test('supports multiple iterators under burst output with a slow consumer', async ({ signal }) => {
 		// Windows PTY spawns are ~5-8s each on CI, and setInterval(fn, 0)
 		// fires slower through ConPTY, so reduce chunk count to stay within timeout.
 		const chunkCount = process.platform === 'win32' ? 200 : 800;
@@ -71,7 +58,7 @@ describe('Subprocess', () => {
 			'i += 1',
 			`if (i >= ${chunkCount}) { clearInterval(id); process.exit(0); }`,
 			'}, 0)',
-		].join(';'));
+		].join(';'), { signal });
 
 		const collect = async (
 			iterable: AsyncIterable<string>,
@@ -81,32 +68,20 @@ describe('Subprocess', () => {
 			for await (const chunk of iterable) {
 				result += chunk;
 				if (perChunkDelayMs > 0) {
-					await delay(perChunkDelayMs);
+					await delay(perChunkDelayMs, undefined, { signal });
 				}
 			}
 			return result;
 		};
 
-		const timeoutController = new AbortController();
-		const outcome = await Promise.race([
-			Promise.all([
-				collect(subprocess),
-				collect(subprocess, 1),
-			]).then(([fast, slow]) => ({
-				type: 'resolved' as const,
-				fast,
-				slow,
-			})),
-			delay(30_000, undefined, { signal: timeoutController.signal })
-				.then(() => ({ type: 'timeout' as const })),
-		]).finally(() => timeoutController.abort());
-		expect(outcome.type).toBe('resolved');
-		if (outcome.type === 'resolved') {
-			const lastChunk = `chunk-${chunkCount - 1}`;
-			expect(outcome.fast.includes(lastChunk)).toBe(true);
-			expect(outcome.slow.includes(lastChunk)).toBe(true);
-		}
-	});
+		const [fast, slow] = await Promise.all([
+			collect(subprocess),
+			collect(subprocess, 1),
+		]);
+		const lastChunk = `chunk-${chunkCount - 1}`;
+		expect(fast.includes(lastChunk)).toBe(true);
+		expect(slow.includes(lastChunk)).toBe(true);
+	}, 30_000);
 
 	test('Symbol.asyncDispose terminates a running process', async () => {
 		const subprocess = spawnNode('setInterval(() => {}, 1000)');
