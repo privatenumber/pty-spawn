@@ -4,18 +4,67 @@ import { fileURLToPath } from 'node:url';
 import type { IPtyForkOptions } from 'node-pty';
 import type { HostEvent } from './pty-host-types.ts';
 
-type ExitEvent = {
+export type ExitEvent = {
 	exitCode: number;
 	signal?: number;
 };
 
-type PtyProcess = {
+export type PtyProcess = {
 	pid: number;
 	onData: (callback: (data: string) => void) => void;
 	onExit: (callback: (event: ExitEvent) => void) => void;
 	kill: (signal?: string) => void;
 	write: (data: string) => void;
 	resize: (columns: number, rows: number) => void;
+};
+
+export type PtyProcessFactory = (
+	file: string,
+	args: string[],
+	options: IPtyForkOptions,
+) => PtyProcess;
+
+const nodePty = process.platform === 'win32'
+	? undefined
+	: await import('node-pty');
+
+export const createNodePtyProcess: PtyProcessFactory = (file, args, options) => {
+	if (!nodePty) {
+		throw new Error('Direct node-pty is disabled on Windows.');
+	}
+
+	const ptyProcess = nodePty.spawn(file, args, options);
+	let exited = false;
+
+	// node-pty resize() throws EBADF after exit; backends expose safe controls.
+	ptyProcess.onExit(() => {
+		exited = true;
+	});
+
+	return {
+		pid: ptyProcess.pid,
+		onData: (callback) => {
+			ptyProcess.onData(callback);
+		},
+		onExit: (callback) => {
+			ptyProcess.onExit(callback);
+		},
+		kill: (signal) => {
+			if (!exited) {
+				ptyProcess.kill(signal);
+			}
+		},
+		write: (data) => {
+			if (!exited) {
+				ptyProcess.write(data);
+			}
+		},
+		resize: (columns, rows) => {
+			if (!exited) {
+				ptyProcess.resize(columns, rows);
+			}
+		},
+	};
 };
 
 // On Windows, node-pty leaves un-unref'd handles (Worker, sockets, drain
@@ -121,4 +170,4 @@ export const createHostedPtyProcess = (
 
 export const createPtyProcess = process.platform === 'win32'
 	? createHostedPtyProcess
-	: await import('node-pty').then(({ spawn }) => spawn);
+	: createNodePtyProcess;
