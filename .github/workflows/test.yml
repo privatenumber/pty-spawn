@@ -1,7 +1,7 @@
 name: Test
 on:
   push:
-    branches: [develop]
+    branches: [develop, debug/windows-iterator-timeout]
   pull_request:
     branches: [main, develop, next]
 
@@ -10,7 +10,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
 
@@ -53,4 +53,6 @@ jobs:
 
       - name: Test
         if: runner.os != 'Linux'
+        env:
+          TESTONLY: iterator started after exit completes immediately
         run: pnpm test
