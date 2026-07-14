@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
 	describe, expect, skip, test,
@@ -48,15 +49,14 @@ describe('Subprocess', () => {
 			return chunks;
 		};
 
-		const timeoutController = new AbortController();
 		const outcome = await Promise.race([
 			collect().then(chunks => ({
 				type: 'resolved',
 				chunks,
 			})),
-			delay(800, undefined, { signal: timeoutController.signal })
+			once(AbortSignal.timeout(800), 'abort')
 				.then(() => ({ type: 'timeout' as const })),
-		]).finally(() => timeoutController.abort());
+		]);
 		expect(outcome.type).toBe('resolved');
 	}, 30_000);
 
