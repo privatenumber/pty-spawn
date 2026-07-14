@@ -11,7 +11,7 @@ import {
 	type ExitEvent,
 	type PtyProcess,
 	type PtyProcessFactory,
-} from '../src/pty-bridge.ts';
+} from '../../src/pty-bridge.ts';
 
 const defaultOptions = {
 	cols: 80,
@@ -62,7 +62,7 @@ const observePtyProcess = (
 	};
 };
 
-const testPtyBackendContract = (
+const ptyBackendContract = (
 	name: string,
 	createPtyProcess: PtyProcessFactory,
 	skipReason?: string,
@@ -225,45 +225,48 @@ const testPtyBackendContract = (
 	timeout: 120_000,
 });
 
-await describe('pty process backend contract', () => {
-	testPtyBackendContract(
+describe('PTY backend', () => {
+	ptyBackendContract(
 		'node-pty direct',
 		createNodePtyProcess,
 		process.platform === 'win32'
 			? 'Direct node-pty cleanup is unreliable on Windows'
 			: undefined,
 	);
-	testPtyBackendContract('hosted node-pty', createHostedPtyProcess);
+	ptyBackendContract('hosted node-pty', createHostedPtyProcess);
+
+	test('selected backend releases the parent event loop after repeated kills', async () => {
+		const stressScriptPath = fileURLToPath(new URL(
+			'../fixtures/pty-backend-stress.ts',
+			import.meta.url,
+		));
+		const child = spawnChildProcess(process.execPath, [stressScriptPath], {
+			stdio: ['ignore', 'pipe', 'pipe'],
+			windowsHide: true,
+			timeout: 85_000,
+		});
+		child.stdout.setEncoding('utf8');
+		child.stderr.setEncoding('utf8');
+		let output = '';
+		let errorOutput = '';
+		child.stdout.on('data', (data: string) => {
+			output += data;
+		});
+		child.stderr.on('data', (data: string) => {
+			errorOutput += data;
+		});
+
+		const [exitCode, signalName] = await once(child, 'close');
+		expect({
+			exitCode,
+			signalName,
+			output,
+			errorOutput,
+		}).toEqual({
+			exitCode: 0,
+			signalName: null,
+			output: '',
+			errorOutput: '',
+		});
+	}, 90_000);
 });
-
-test('selected backend releases the parent event loop after repeated kills', async () => {
-	const stressScriptPath = fileURLToPath(new URL('pty-backend-stress.ts', import.meta.url));
-	const child = spawnChildProcess(process.execPath, [stressScriptPath], {
-		stdio: ['ignore', 'pipe', 'pipe'],
-		windowsHide: true,
-		timeout: 85_000,
-	});
-	child.stdout.setEncoding('utf8');
-	child.stderr.setEncoding('utf8');
-	let output = '';
-	let errorOutput = '';
-	child.stdout.on('data', (data: string) => {
-		output += data;
-	});
-	child.stderr.on('data', (data: string) => {
-		errorOutput += data;
-	});
-
-	const [exitCode, signalName] = await once(child, 'close');
-	expect({
-		exitCode,
-		signalName,
-		output,
-		errorOutput,
-	}).toEqual({
-		exitCode: 0,
-		signalName: null,
-		output: '',
-		errorOutput: '',
-	});
-}, 90_000);

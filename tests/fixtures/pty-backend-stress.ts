@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { createPtyProcess } from '../src/pty-bridge.ts';
+import { createPtyProcess } from '../../src/pty-bridge.ts';
 
 const iterations = process.platform === 'win32' ? 5 : 10;
 
