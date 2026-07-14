@@ -97,7 +97,7 @@ describe('Subprocess', () => {
 		}
 		logState('iterator-end', { chunks });
 		expect(chunks).toBe(0);
-	}, 800);
+	}, 15_000);
 
 	test('supports multiple iterators under burst output with a slow consumer', async ({ signal }) => {
 		// Windows PTY spawns are ~5-8s each on CI, and setInterval(fn, 0)
