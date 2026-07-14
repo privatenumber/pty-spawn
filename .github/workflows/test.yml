@@ -53,6 +53,4 @@ jobs:
 
       - name: Test
         if: runner.os != 'Linux'
-        env:
-          TESTONLY: iterator started after exit completes immediately
         run: pnpm test
