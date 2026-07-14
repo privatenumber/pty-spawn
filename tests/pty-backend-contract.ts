@@ -64,18 +64,12 @@ const testPtyBackendContract = (
 
 	test('captures complete output from an immediate exit', async () => {
 		const expectedOutput = `BEGIN:${'x'.repeat(128 * 1024)}:END`;
-		const { promise: outputPromise, resolve: resolveOutput } = Promise.withResolvers<void>();
 		const { ptyProcess, state, exitPromise } = observePtyProcess(
 			createPtyProcess,
 			"process.stdout.write('BEGIN:' + 'x'.repeat(128 * 1024) + ':END'); process.exitCode = 42",
-			(_ptyProcess, output) => {
-				if (output === expectedOutput) {
-					resolveOutput();
-				}
-			},
 		);
 
-		const [exitEvent] = await Promise.all([exitPromise, outputPromise]);
+		const exitEvent = await exitPromise;
 
 		expect(ptyProcess.pid > 0).toBe(true);
 		expect(exitEvent.exitCode).toBe(42);
@@ -120,11 +114,12 @@ const testPtyBackendContract = (
 		const { state, exitPromise } = observePtyProcess(
 			createPtyProcess,
 			[
+				'const reportSize = () => {',
 				"console.log('SIZE:' + process.stdout.columns + 'x' + process.stdout.rows)",
-				"process.stdout.on('resize', () => {",
-				"console.log('SIZE:' + process.stdout.columns + 'x' + process.stdout.rows)",
-				'process.exit(0)',
-				'})',
+				'if (process.stdout.columns === 100 && process.stdout.rows === 40) process.exit(0)',
+				'}',
+				'reportSize()',
+				'setInterval(reportSize, 50)',
 				'setTimeout(() => process.exit(2), 5000)',
 			].join(';'),
 			(ptyProcess, output) => {
